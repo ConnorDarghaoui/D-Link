@@ -1,0 +1,29 @@
+[package]
+name = "d-link"
+version = "0.1.0"
+description = "TI-Nspire Connection Tool - Fork mejorado de N-Link"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "d_link_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+
+# USB y comunicacion con TI-Nspire
+# Versiones compatibles con libnspire
+rusb = "0.6"
+libnspire = "0.2"
+anyhow = "1.0"
+lazy_static = "1.4"
+hashbrown = "0.14"
+
