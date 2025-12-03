@@ -1,34 +1,33 @@
 <template>
-  <div class="h-screen flex bg-gray-50/50">
-    <!-- Sidebar izquierdo -->
-    <aside class="w-64 flex flex-col bg-white border-r border-gray-100 flex-shrink-0">
-      <header class="px-5 py-4">
-        <h1 class="text-lg font-semibold flex items-center gap-2 text-gray-900">
-          <span class="i-lucide-link text-blue-500" />
-          D-Link
-        </h1>
-      </header>
+  <div class="h-screen flex flex-col bg-gray-50/50">
+    <!-- Barra de titulo personalizada -->
+    <TitleBar />
 
-      <DeviceSelector />
+    <div class="flex-1 flex overflow-hidden">
+      <!-- Sidebar izquierdo -->
+      <aside class="w-64 flex flex-col bg-white border-r border-gray-100 flex-shrink-0">
+        <div class="px-5 py-3">
+          <DeviceSelector />
+        </div>
 
-      <div class="flex-1 overflow-auto">
-        <DeviceInfo :device="selectedDevice" />
-      </div>
+        <div class="flex-1 overflow-auto">
+          <DeviceInfo :device="selectedDevice" />
+        </div>
 
-      <OperationQueue :queue="selectedDeviceQueue" />
+        <OperationQueue :queue="selectedDeviceQueue" />
 
-      <footer class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
-        <p>D-Link - Lucas Boniche</p>
-        <p class="mt-0.5">
-          Basado en
-          <a
-            href="https://lights0123.com/n-link/"
-            target="_blank"
-            class="text-blue-500 hover:underline"
-          >N-Link</a>
-        </p>
-      </footer>
-    </aside>
+        <footer class="px-5 py-3 border-t border-gray-100 text-xs text-gray-400">
+          <p>D-Link - Lucas Boniche</p>
+          <p class="mt-0.5">
+            Basado en
+            <a
+              href="https://lights0123.com/n-link/"
+              target="_blank"
+              class="text-blue-500 hover:underline"
+            >N-Link</a>
+          </p>
+        </footer>
+      </aside>
 
     <!-- Contenido principal -->
     <main class="flex-1 flex flex-col min-w-0 bg-white m-2 rounded-xl border border-gray-100 overflow-hidden">
@@ -107,6 +106,7 @@
         </div>
       </Transition>
     </Teleport>
+    </div>
   </div>
 </template>
 
@@ -115,6 +115,7 @@ import { onMounted } from "vue";
 import { storeToRefs } from "pinia";
 import { useDevicesStore } from "@/stores/devices";
 import { DeviceSelector, DeviceInfo, FileBrowser, OperationQueue } from "@/components";
+import TitleBar from "@/components/TitleBar.vue";
 
 const devicesStore = useDevicesStore();
 
