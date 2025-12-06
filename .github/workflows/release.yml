@@ -5,65 +5,18 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      draft:
-        description: 'Create as draft release'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  publish-tauri:
-    permissions:
-      contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # macOS ARM (M1+)
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          # macOS Intel
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-          # Linux
-          - platform: 'ubuntu-22.04'
-            args: ''
-          # Windows
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
-    
+  build-linux:
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install dependencies (Ubuntu only)
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -72,38 +25,124 @@ jobs:
             librsvg2-dev \
             patchelf \
             libusb-1.0-0-dev \
-            libudev-dev
+            libudev-dev \
+            pkg-config
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v1
+      - name: Build Tauri app (Linux)
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Firma de codigo Windows (opcional)
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: |
-            ## D-Link ${{ github.ref_name }}
-            
-            ### Descargas
-            
-            **Windows:**
-            - `.msi` - Instalador MSI
-            - `.exe` - Instalador NSIS
-            
-            **Linux:**
-            - `.deb` - Debian/Ubuntu
-            - `.rpm` - Fedora/RHEL
-            - `.AppImage` - Universal (portable)
-            
-            **macOS:**
-            - `.dmg` (aarch64) - Apple Silicon (M1+)
-            - `.dmg` (x64) - Intel
-          releaseDraft: ${{ github.event.inputs.draft == 'true' || github.event_name == 'push' }}
+          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
+          releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install vcpkg and libusb
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+          C:\vcpkg\vcpkg install libusb:x64-windows-static
+          echo "LIBUSB_DIR=C:\vcpkg\installed\x64-windows-static" >> $env:GITHUB_ENV
+          echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Tauri app (Windows)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'D-Link ${{ github.ref_name }}'
+          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
+          releaseDraft: true
+          prerelease: false
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libusb
+        run: brew install libusb
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Tauri app (macOS)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'D-Link ${{ github.ref_name }}'
+          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
+          releaseDraft: true
+          prerelease: false
