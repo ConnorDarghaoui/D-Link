@@ -22,6 +22,7 @@ makedepends=(
     'pnpm'
     'pkg-config'
 )
+install=$pkgname.install
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
@@ -43,11 +44,15 @@ build() {
 package() {
     cd "D-Link-$pkgver"
     
+    # Binario
     install -Dm755 "src-tauri/target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+    
+    # Iconos
     install -Dm644 "src-tauri/icons/icon.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
     install -Dm644 "src-tauri/icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/$pkgname.png"
     install -Dm644 "src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/$pkgname.png"
     
+    # Desktop entry
     install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
 [Desktop Entry]
 Type=Application
@@ -59,5 +64,16 @@ Icon=$pkgname
 Terminal=false
 Categories=Utility;Development;
 StartupWMClass=$pkgname
+Keywords=TI;Nspire;Calculator;USB;
+EOF
+
+    # Reglas udev para acceso USB sin root
+    install -Dm644 /dev/stdin "$pkgdir/usr/lib/udev/rules.d/69-$pkgname.rules" <<EOF
+# TI-Nspire calculators - permite acceso sin root
+# TI-Nspire CX / CX CAS
+SUBSYSTEM=="usb", ATTR{idVendor}=="0451", ATTR{idProduct}=="e012", MODE="0666", TAG+="uaccess"
+# TI-Nspire CX II / CX II CAS
+SUBSYSTEM=="usb", ATTR{idVendor}=="0451", ATTR{idProduct}=="e022", MODE="0666", TAG+="uaccess"
 EOF
 }
+

@@ -61,9 +61,9 @@ function getActionLabel(action: QueueAction): string {
     case "download":
       return `Descargando ${action.path.split("/").pop()}`;
     case "upload":
-      return `Subiendo ${action.file.name}`;
+      return `Subiendo ${action.src.split("/").pop()}`;
     case "uploadOs":
-      return `Actualizando OS: ${action.file.name}`;
+      return `Actualizando OS: ${action.src.split("/").pop()}`;
     case "delete":
       return `Eliminando ${action.path.split("/").pop()}`;
     case "createDir":

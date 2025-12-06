@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { formatSize, formatVersion } from "@/utils";
 import type { Device } from "@/types";
 
 const props = defineProps<{
@@ -107,16 +108,4 @@ const batteryColor = computed(() => {
   if (battery > 20) return "bg-yellow-500";
   return "bg-red-600";
 });
-
-function formatVersion(version: string): string {
-  return version || "N/A";
-}
-
-function formatSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 </script>

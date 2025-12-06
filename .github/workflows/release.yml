@@ -5,13 +5,35 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
 
+env:
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
 jobs:
+  # ============================================================================
+  # BUILD LINUX - DEB, RPM, AppImage
+  # ============================================================================
   build-linux:
     runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            rust_target: x86_64-unknown-linux-gnu
+          # Descomentar para ARM64
+          # - arch: aarch64
+          #   rust_target: aarch64-unknown-linux-gnu
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,7 +48,8 @@ jobs:
             patchelf \
             libusb-1.0-0-dev \
             libudev-dev \
-            pkg-config
+            pkg-config \
+            libssl-dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,26 +63,49 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: linux-${{ matrix.arch }}
 
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build Tauri app (Linux)
+      - name: Build Tauri app (Linux ${{ matrix.arch }})
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
-          releaseDraft: true
+          releaseBody: |
+            ## D-Link ${{ github.ref_name }}
+            
+            ### Descargas
+            
+            **Windows:**
+            - `.msi` - Instalador MSI (recomendado para empresas)
+            - `.exe` - Instalador NSIS
+            
+            **Linux:**
+            - `.deb` - Debian/Ubuntu
+            - `.rpm` - Fedora/RHEL
+            - `.AppImage` - Universal (portable)
+            
+            **macOS:**
+            - `.dmg` - Imagen de disco
+            - `.app` - Aplicacion
+          releaseDraft: ${{ github.event.inputs.draft || true }}
           prerelease: false
+          args: --target ${{ matrix.rust_target }}
 
+  # ============================================================================
+  # BUILD WINDOWS - MSI, NSIS con firma de codigo
+  # ============================================================================
   build-windows:
     runs-on: windows-latest
     steps:
@@ -83,23 +129,49 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: windows
 
       - name: Install frontend dependencies
         run: pnpm install
+
+      # Importar certificado de firma si existe
+      - name: Import code signing certificate
+        if: env.WINDOWS_CERTIFICATE != ''
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          $certPath = Join-Path $env:RUNNER_TEMP "certificate.pfx"
+          [IO.File]::WriteAllBytes($certPath, $certBytes)
+          Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password (ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
 
       - name: Build Tauri app (Windows)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma de codigo Windows (si hay certificado configurado)
+          TAURI_BUNDLE_WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          TAURI_BUNDLE_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
-          releaseDraft: true
+          releaseDraft: ${{ github.event.inputs.draft || true }}
           prerelease: false
 
+  # ============================================================================
+  # BUILD MACOS - DMG, APP con firma y notarizacion
+  # ============================================================================
   build-macos:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            rust_target: x86_64-apple-darwin
+          - arch: aarch64
+            rust_target: aarch64-apple-darwin
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -116,22 +188,73 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: macos-${{ matrix.arch }}
 
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build Tauri app (macOS)
+      # Configurar firma de codigo para macOS si hay certificado
+      - name: Import Apple codesigning certificate
+        if: env.APPLE_CERTIFICATE != ''
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm certificate.p12
+
+      - name: Build Tauri app (macOS ${{ matrix.arch }})
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Firma de codigo macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          # Notarizacion Apple (opcional)
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
-          releaseDraft: true
+          releaseDraft: ${{ github.event.inputs.draft || true }}
           prerelease: false
+          args: --target ${{ matrix.rust_target }}
+
+  # ============================================================================
+  # PUBLICAR RELEASE (despues de revisar el draft)
+  # ============================================================================
+  # publish-release:
+  #   needs: [build-linux, build-windows, build-macos]
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+  #   steps:
+  #     - name: Publish release
+  #       uses: actions/github-script@v7
+  #       with:
+  #         script: |
+  #           const { owner, repo } = context.repo
+  #           const releases = await github.rest.repos.listReleases({ owner, repo })
+  #           const draft = releases.data.find(r => r.draft && r.tag_name === context.ref.replace('refs/tags/', ''))
+  #           if (draft) {
+  #             await github.rest.repos.updateRelease({
+  #               owner,
+  #               repo,
+  #               release_id: draft.id,
+  #               draft: false
+  #             })
+  #           }

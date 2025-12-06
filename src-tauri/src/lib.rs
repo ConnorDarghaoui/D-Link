@@ -1,6 +1,6 @@
 //! Biblioteca principal de D-Link para Tauri 2.x.
 //! Implementa la comunicacion USB con calculadoras TI-Nspire.
-//! 
+//!
 //! Basado en n-link, con mejoras de arquitectura y compatibilidad multiplataforma.
 
 #![allow(clippy::type_complexity)]
@@ -21,7 +21,7 @@ use tauri::{AppHandle, Emitter};
 
 pub mod cmd;
 
-use cmd::{agregar_dispositivo, AddDevicePayload, DeviceId, FileInfo, DeviceInfo, ProgressUpdate};
+use cmd::{agregar_dispositivo, AddDevicePayload, DeviceId, DeviceInfo, FileInfo, ProgressUpdate};
 
 // Estado global de dispositivos conectados
 lazy_static::lazy_static! {
@@ -31,7 +31,7 @@ lazy_static::lazy_static! {
 /// Convierte un Info de libnspire a nuestro DeviceInfo
 fn convertir_info(info: &libnspire::info::Info) -> DeviceInfo {
     use libnspire::info::{Battery, HardwareType};
-    
+
     // El enum Battery no representa porcentaje real, solo estados
     // Powered = conectado a corriente, Ok = bateria bien, Low = bateria baja
     let battery_percent = match info.battery {
@@ -40,7 +40,7 @@ fn convertir_info(info: &libnspire::info::Info) -> DeviceInfo {
         Battery::Low => 20,
         Battery::Unknown(_) => 50, // Valor desconocido, usar 50% por defecto
     };
-    
+
     let hw_type_num = match info.hw_type {
         HardwareType::Cas => 0,
         HardwareType::NonCas => 1,
@@ -48,7 +48,7 @@ fn convertir_info(info: &libnspire::info::Info) -> DeviceInfo {
         HardwareType::NonCasCx => 3,
         HardwareType::Unknown(v) => v,
     };
-    
+
     DeviceInfo {
         name: info.name.clone(),
         free_storage: info.free_storage,
@@ -119,7 +119,7 @@ impl Hotplug<GlobalContext> for MonitorDispositivos {
                     Ok((id, datos)) => {
                         let nombre = datos.nombre.clone();
                         let necesita_drivers = datos.necesita_drivers;
-                        
+
                         if let Ok(mut mapa) = DEVICES.write() {
                             mapa.insert(id, datos);
                         }
@@ -152,7 +152,7 @@ impl Hotplug<GlobalContext> for MonitorDispositivos {
 
     fn device_left(&mut self, dispositivo: rusb::Device<GlobalContext>) {
         let clave = (dispositivo.bus_number(), dispositivo.address());
-        
+
         if let Ok(mut mapa) = DEVICES.write() {
             if mapa.remove(&clave).is_some() {
                 let _ = self.app_handle.emit(
@@ -172,7 +172,7 @@ fn obtener_dispositivo_abierto(
     id: &DeviceId,
 ) -> Result<Arc<Mutex<libnspire::Handle<GlobalContext>>>, anyhow::Error> {
     let mapa = DEVICES.read().map_err(|e| anyhow::anyhow!("{}", e))?;
-    
+
     if let Some(dispositivo) = mapa.get(&(id.bus_number, id.address)) {
         match &dispositivo.estado {
             DeviceState::Open(handle, _) => Ok(handle.clone()),
@@ -207,10 +207,10 @@ fn crear_reporter_progreso(
 ) -> impl FnMut(usize) + '_ {
     let umbral = (total / 100).max(1); // 1% del total, minimo 1 byte
     let mut ultimo_reportado = total;
-    
+
     move |restante| {
         let diferencia = ultimo_reportado.saturating_sub(restante);
-        
+
         // Reportar si hay cambio >= 1% o si es el final
         if diferencia >= umbral || restante == 0 {
             ultimo_reportado = restante;
@@ -238,11 +238,11 @@ fn open_device(bus_number: u8, address: u8) -> Result<DeviceInfo, SerializedErro
         let dispositivo = mapa
             .get(&(bus_number, address))
             .ok_or("Dispositivo no encontrado")?;
-        
+
         if !matches!(dispositivo.estado, DeviceState::Closed) {
             return Err("El dispositivo ya esta abierto".into());
         }
-        
+
         dispositivo.dispositivo.clone()
     };
 
@@ -256,11 +256,8 @@ fn open_device(bus_number: u8, address: u8) -> Result<DeviceInfo, SerializedErro
         let dispositivo = mapa
             .get_mut(&(bus_number, address))
             .ok_or("Dispositivo perdido durante apertura")?;
-        
-        dispositivo.estado = DeviceState::Open(
-            Arc::new(Mutex::new(handle)), 
-            info.clone()
-        );
+
+        dispositivo.estado = DeviceState::Open(Arc::new(Mutex::new(handle)), info.clone());
     }
 
     // Convertir info de libnspire a nuestro formato
@@ -274,7 +271,7 @@ fn close_device(bus_number: u8, address: u8) -> Result<(), SerializedError> {
     let dispositivo = mapa
         .get_mut(&(bus_number, address))
         .ok_or("Dispositivo no encontrado")?;
-    
+
     dispositivo.estado = DeviceState::Closed;
     Ok(())
 }
@@ -286,12 +283,15 @@ fn update_device(
     address: u8,
     app_handle: AppHandle,
 ) -> Result<DeviceInfo, SerializedError> {
-    let id = DeviceId { bus_number, address };
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
-    
+
     let info = envolver_error(handle.info(), id, &app_handle)?;
-    
+
     Ok(convertir_info(&info))
 }
 
@@ -303,7 +303,10 @@ fn list_dir(
     path: String,
     app_handle: AppHandle,
 ) -> Result<Vec<FileInfo>, SerializedError> {
-    let id = DeviceId { bus_number, address };
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -330,9 +333,12 @@ fn download_file(
     dest: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
     let ruta_destino = PathBuf::from(dest);
-    
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -367,7 +373,10 @@ fn upload_file(
     dest: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
     let ruta_origen = PathBuf::from(&src);
 
     let handle = obtener_dispositivo_abierto(&id)?;
@@ -405,7 +414,10 @@ fn upload_os(
     src: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
 
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
@@ -433,8 +445,11 @@ fn delete_file(
     path: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
-    
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -450,8 +465,11 @@ fn delete_dir(
     path: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
-    
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -467,8 +485,11 @@ fn create_dir(
     path: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
-    
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -485,8 +506,11 @@ fn move_file(
     dest: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
-    
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -503,8 +527,11 @@ fn copy_file(
     dest: String,
     app_handle: AppHandle,
 ) -> Result<(), SerializedError> {
-    let id = DeviceId { bus_number, address };
-    
+    let id = DeviceId {
+        bus_number,
+        address,
+    };
+
     let handle = obtener_dispositivo_abierto(&id)?;
     let handle = handle.lock().map_err(|e| e.to_string())?;
 
@@ -529,17 +556,18 @@ pub fn run() {
     let hotplug_registrado = AtomicBool::new(false);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
             // Registrar hotplug USB si esta disponible
             if !hotplug_registrado.swap(true, Ordering::SeqCst) {
                 let app_handle = app.handle().clone();
-                
+
                 if rusb::has_hotplug() {
-                    let monitor = MonitorDispositivos { 
-                        app_handle: app_handle.clone() 
+                    let monitor = MonitorDispositivos {
+                        app_handle: app_handle.clone(),
                     };
-                    
+
                     match GlobalContext::default().register_callback(
                         Some(VID),
                         None,
@@ -563,7 +591,7 @@ pub fn run() {
                     println!("Sistema sin soporte hotplug USB - se requiere enumeracion manual");
                 }
             }
-            
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -585,4 +613,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("Error iniciando aplicacion D-Link");
 }
-

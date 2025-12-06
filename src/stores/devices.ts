@@ -6,6 +6,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { listen } from "@tauri-apps/api/event";
 import { usbService } from "@/services/usbService";
+import { PROGRESS_DEBOUNCE_MS } from "@/utils";
 import type {
   Device,
   DeviceId,
@@ -26,10 +27,9 @@ export const useDevicesStore = defineStore("devices", () => {
   const lastError = ref<Error | null>(null);
 
   let queueIdCounter = 0;
-  
+
   // Debounce para actualizaciones de progreso (evita re-renders excesivos)
   let ultimoProgresoTimestamp = 0;
-  const DEBOUNCE_PROGRESO_MS = 50; // Minimo 50ms entre actualizaciones
 
   // Getters computados
   const deviceList = computed(() => Array.from(devices.value.values()));
@@ -89,7 +89,7 @@ export const useDevicesStore = defineStore("devices", () => {
   function updateProgress(progress: ProgressUpdate) {
     // Debounce: ignorar actualizaciones muy frecuentes (excepto al finalizar)
     const ahora = Date.now();
-    if (progress.remaining > 0 && ahora - ultimoProgresoTimestamp < DEBOUNCE_PROGRESO_MS) {
+    if (progress.remaining > 0 && ahora - ultimoProgresoTimestamp < PROGRESS_DEBOUNCE_MS) {
       return;
     }
     ultimoProgresoTimestamp = ahora;
@@ -192,13 +192,12 @@ export const useDevicesStore = defineStore("devices", () => {
         break;
       }
       case "upload": {
-        // El archivo viene del frontend, necesitamos guardarlo primero
-        // En Tauri 2.x usamos el dialogo de archivo
-        await usbService.uploadFile(id, action.file.name, action.path);
+        // La ruta src es la ruta absoluta del archivo en el sistema
+        await usbService.uploadFile(id, action.src, action.path);
         break;
       }
       case "uploadOs":
-        await usbService.uploadOs(id, action.file.name);
+        await usbService.uploadOs(id, action.src);
         break;
       case "delete":
         if (action.isDir) {

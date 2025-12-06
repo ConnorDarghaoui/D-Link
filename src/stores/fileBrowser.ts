@@ -6,15 +6,19 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { usbService } from "@/services/usbService";
 import { useDevicesStore } from "./devices";
+import {
+  CACHE_TTL_MS,
+  CACHE_CLEANUP_INTERVAL_MS,
+  REFRESH_AFTER_OPERATION_MS
+} from "@/utils";
 import type { FileInfo } from "@/types";
 import { serializeDeviceId } from "@/types";
 
-// Cache de directorios con TTL de 30 segundos
+// Cache de directorios
 interface CacheEntry {
   files: FileInfo[];
   timestamp: number;
 }
-const CACHE_TTL_MS = 30000;
 const directorioCache = new Map<string, CacheEntry>();
 
 export const useFileBrowserStore = defineStore("fileBrowser", () => {
@@ -99,7 +103,7 @@ export const useFileBrowserStore = defineStore("fileBrowser", () => {
       files.value = resultado;
       currentPath.value = path;
       selectedFiles.value.clear();
-      
+
       // Guardar en cache
       directorioCache.set(cacheKey, {
         files: resultado,
@@ -218,7 +222,7 @@ export const useFileBrowserStore = defineStore("fileBrowser", () => {
 
     selectedFiles.value.clear();
     // Refrescar despues de un delay
-    setTimeout(() => refresh(), 500);
+    setTimeout(() => refresh(), REFRESH_AFTER_OPERATION_MS);
   }
 
   async function createDirectory(name: string) {
@@ -237,17 +241,45 @@ export const useFileBrowserStore = defineStore("fileBrowser", () => {
     setTimeout(() => refresh(), 500);
   }
 
-  async function uploadFiles(fileList: File[]) {
+  /**
+   * Abre dialogo nativo para seleccionar y subir archivos.
+   * Usa rutas absolutas del sistema para que el backend Rust pueda acceder a los archivos.
+   */
+  async function uploadFiles() {
+    const device = devicesStore.selectedDevice;
+    if (!device) return;
+
+    const rutas = await usbService.selectFilesForUpload();
+    if (rutas.length === 0) return;
+
+    const key = serializeDeviceId(device.id);
+
+    for (const src of rutas) {
+      devicesStore.addToQueue(key, {
+        type: "upload",
+        path: currentPath.value,
+        src,
+      });
+    }
+
+    setTimeout(() => refresh(), REFRESH_AFTER_OPERATION_MS);
+  }
+
+  /**
+   * Sube archivos desde rutas absolutas (usado por drag and drop).
+   * Las rutas vienen directamente del sistema de archivos.
+   */
+  async function uploadFilesFromPaths(rutas: string[]) {
     const device = devicesStore.selectedDevice;
     if (!device) return;
 
     const key = serializeDeviceId(device.id);
 
-    for (const file of fileList) {
+    for (const src of rutas) {
       devicesStore.addToQueue(key, {
         type: "upload",
         path: currentPath.value,
-        file,
+        src,
       });
     }
 
@@ -273,8 +305,13 @@ export const useFileBrowserStore = defineStore("fileBrowser", () => {
     }
   }
 
-  // Ejecutar limpieza cada minuto
-  setInterval(limpiarCacheExpirado, 60000);
+  // Ejecutar limpieza cada minuto (con cleanup para evitar memory leaks)
+  const intervalId = setInterval(limpiarCacheExpirado, CACHE_CLEANUP_INTERVAL_MS);
+
+  // Limpiar intervalo cuando el store se desmonte
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => clearInterval(intervalId));
+  }
 
   return {
     // Estado
@@ -307,6 +344,7 @@ export const useFileBrowserStore = defineStore("fileBrowser", () => {
     deleteSelected,
     createDirectory,
     uploadFiles,
+    uploadFilesFromPaths,
     reset,
   };
 });

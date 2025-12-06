@@ -1,11 +1,11 @@
 <template>
-  <div class="border-b border-gray-100">
+  <div class="border-b border-gray-100 dark:border-gray-800">
     <!-- Boton para escanear -->
     <button
-      class="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 transition-all"
+      class="w-full px-5 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
       @click="handleScan"
     >
-      <span class="text-sm font-medium text-gray-700">Dispositivos</span>
+      <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Dispositivos</span>
       <span
         v-if="isEnumerating"
         class="i-lucide-loader-2 animate-spin text-blue-500"
@@ -21,7 +21,7 @@
         class="w-full px-5 py-2.5 flex items-center gap-3 transition-all"
         :class="isSelected(device) 
           ? 'bg-blue-500/5 border-l-2 border-blue-500 text-blue-500' 
-          : 'hover:bg-gray-50 text-gray-600'"
+          : 'hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400'"
         @click="selectDevice(device)"
       >
         <span
@@ -29,8 +29,8 @@
           :class="device.needsDrivers ? 'text-amber-400' : ''"
         />
         <div class="flex-1 text-left min-w-0">
-          <p class="text-sm font-medium truncate" :class="isSelected(device) ? 'text-gray-900' : ''">{{ device.name }}</p>
-          <p class="text-xs text-gray-400">
+          <p class="text-sm font-medium truncate" :class="isSelected(device) ? 'text-gray-900 dark:text-gray-100' : ''">{{ device.name }}</p>
+          <p class="text-xs text-gray-400 dark:text-gray-500">
             {{ device.isCxII ? "CX II" : "CX" }}
           </p>
         </div>
@@ -50,7 +50,7 @@
       v-else-if="hasEnumerated"
       class="px-5 py-6 text-center"
     >
-      <p class="text-sm text-gray-400">Sin dispositivos</p>
+      <p class="text-sm text-gray-400 dark:text-gray-500">Sin dispositivos</p>
     </div>
   </div>
 </template>

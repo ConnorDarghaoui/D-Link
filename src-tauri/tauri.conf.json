@@ -15,9 +15,8 @@
         "title": "D-Link",
         "width": 800,
         "height": 600,
-        "decorations": false,
-        "resizable": true,
-        "transparent": false
+        "decorations": true,
+        "resizable": true
       }
     ],
     "security": {
@@ -26,7 +25,15 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "msi", "nsis", "dmg", "app"],
+    "targets": [
+      "deb",
+      "rpm",
+      "appimage",
+      "msi",
+      "nsis",
+      "dmg",
+      "app"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -48,10 +55,16 @@
     },
     "linux": {
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libusb-1.0-0"]
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libusb-1.0-0"
+        ]
       },
       "rpm": {
-        "depends": ["webkit2gtk4.1", "libusb1"]
+        "depends": [
+          "webkit2gtk4.1",
+          "libusb1"
+        ]
       }
     }
   }

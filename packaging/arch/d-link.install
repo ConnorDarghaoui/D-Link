@@ -1,0 +1,31 @@
+# D-Link install script for Arch Linux
+
+post_install() {
+    echo ">>> Recargando reglas udev..."
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+    
+    echo ">>> Actualizando cache de iconos..."
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+    
+    echo ""
+    echo "========================================"
+    echo "  D-Link instalado correctamente!"
+    echo "========================================"
+    echo ""
+    echo "Si tu calculadora estaba conectada,"
+    echo "desconectala y vuelve a conectarla."
+    echo ""
+}
+
+post_upgrade() {
+    post_install
+}
+
+post_remove() {
+    echo ">>> Recargando reglas udev..."
+    udevadm control --reload-rules 2>/dev/null || true
+    
+    echo ">>> Actualizando cache de iconos..."
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+}

@@ -3,6 +3,7 @@
  * Encapsula todas las llamadas al backend Rust.
  */
 import { invoke } from "@tauri-apps/api/core";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type { DeviceId, DeviceInfo, FileInfo } from "@/types";
 
 /** Datos de dispositivo agregado desde el backend */
@@ -147,25 +148,32 @@ class TauriUsbService {
   }
 
   /**
-   * Abre un dialogo para seleccionar archivos.
+   * Abre dialogo nativo para seleccionar archivos a subir.
+   * Retorna las rutas absolutas de los archivos seleccionados.
    */
-  async selectFiles(
-    multiple: boolean,
-    filters?: { name: string; extensions: string[] }[]
-  ): Promise<string[] | null> {
-    return await invoke<string[] | null>("select_files", {
-      multiple,
-      filters,
+  async selectFilesForUpload(): Promise<string[]> {
+    const result = await openDialog({
+      multiple: true,
+      filters: [{ name: "TNS files", extensions: ["tns"] }],
     });
+
+    if (!result) return [];
+
+    // openDialog retorna string | string[] | null
+    return Array.isArray(result) ? result : [result];
   }
 
   /**
-   * Abre un dialogo para guardar archivo.
+   * Abre dialogo nativo para seleccionar archivo OS.
    */
-  async selectSavePath(defaultName: string): Promise<string | null> {
-    return await invoke<string | null>("select_save_path", {
-      defaultName,
+  async selectOsFile(extension: string): Promise<string | null> {
+    const result = await openDialog({
+      multiple: false,
+      filters: [{ name: "TI Nspire OS upgrade files", extensions: [extension] }],
     });
+
+    if (!result) return null;
+    return Array.isArray(result) ? result[0] : result;
   }
 }
 

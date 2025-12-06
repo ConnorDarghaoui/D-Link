@@ -50,8 +50,8 @@ export interface Device {
 /** Accion de la cola de operaciones */
 export type QueueAction =
   | { type: "download"; path: string; size: number }
-  | { type: "upload"; path: string; file: File }
-  | { type: "uploadOs"; file: File }
+  | { type: "upload"; path: string; src: string }
+  | { type: "uploadOs"; src: string }
   | { type: "delete"; path: string; isDir: boolean }
   | { type: "createDir"; path: string }
   | { type: "move"; src: string; dest: string }

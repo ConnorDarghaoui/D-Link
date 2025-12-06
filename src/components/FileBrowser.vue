@@ -21,7 +21,7 @@
       <!-- Loader -->
       <div
         v-if="isLoading"
-        class="absolute inset-0 bg-white/90 flex items-center justify-center z-10"
+        class="absolute inset-0 bg-white/90 dark:bg-gray-900/90 flex items-center justify-center z-10"
       >
         <span class="i-lucide-loader-2 text-3xl text-blue-500 animate-spin" />
       </div>
@@ -38,7 +38,7 @@
     </div>
 
     <!-- Barra de estado -->
-    <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
+    <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500">
       <span>{{ sortedFiles.length }} elementos</span>
       <span v-if="selectedCount > 0" class="text-blue-500">{{ selectedCount }} seleccionados</span>
     </div>
@@ -47,7 +47,7 @@
     <Transition name="slide-up">
       <div
         v-if="selectedCount > 0"
-        class="absolute bottom-14 left-1/2 -translate-x-1/2 bg-white rounded-xl shadow-lg border border-gray-100 p-1.5 flex gap-1"
+        class="absolute bottom-14 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 p-1.5 flex gap-1"
       >
         <button class="btn-icon" title="Descargar" @click="downloadSelected">
           <span class="i-lucide-download text-sm" />
@@ -61,14 +61,7 @@
       </div>
     </Transition>
 
-    <!-- Input oculto para upload -->
-    <input
-      ref="fileInput"
-      type="file"
-      multiple
-      class="hidden"
-      @change="handleFileUpload"
-    />
+
 
     <!-- Dialog nueva carpeta -->
     <Teleport to="body">
@@ -77,8 +70,8 @@
         class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
         @click.self="showNewFolderDialog = false"
       >
-        <div class="bg-white rounded-xl shadow-2xl p-5 w-72">
-          <h3 class="text-base font-medium text-gray-900 mb-4">Nueva carpeta</h3>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 w-72">
+          <h3 class="text-base font-medium text-gray-900 dark:text-gray-100 mb-4">Nueva carpeta</h3>
           <input
             v-model="newFolderName"
             type="text"
@@ -105,9 +98,9 @@
         class="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
         @click.self="showDeleteDialog = false"
       >
-        <div class="bg-white rounded-xl shadow-2xl p-5 w-80">
-          <h3 class="text-base font-medium text-gray-900 mb-2">Eliminar</h3>
-          <p class="text-sm text-gray-500 mb-5">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-5 w-80">
+          <h3 class="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">Eliminar</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400 mb-5">
             ¿Eliminar {{ selectedCount }} elemento(s)? Esta accion es irreversible.
           </p>
           <div class="flex justify-end gap-2">
@@ -128,8 +121,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted, onUnmounted } from "vue";
 import { storeToRefs } from "pinia";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useFileBrowserStore } from "@/stores/fileBrowser";
 import { useDevicesStore } from "@/stores/devices";
 import { serializeDeviceId } from "@/types";
@@ -170,7 +164,7 @@ const {
 const showNewFolderDialog = ref(false);
 const showDeleteDialog = ref(false);
 const newFolderName = ref("");
-const fileInput = ref<HTMLInputElement | null>(null);
+
 
 // Cargar directorio cuando cambia el dispositivo
 watch(
@@ -184,16 +178,11 @@ watch(
   { immediate: true }
 );
 
+/**
+ * Abre el dialogo nativo de seleccion de archivos y sube los seleccionados.
+ */
 function triggerUpload() {
-  fileInput.value?.click();
-}
-
-function handleFileUpload(event: Event) {
-  const input = event.target as HTMLInputElement;
-  if (input.files) {
-    uploadFiles(Array.from(input.files));
-    input.value = "";
-  }
+  uploadFiles();
 }
 
 function createNewFolder() {
@@ -234,6 +223,27 @@ function executeDelete() {
   deleteSelected();
   showDeleteDialog.value = false;
 }
+
+// Soporte Drag and Drop
+let unlistenDragDrop: (() => void) | null = null;
+
+onMounted(async () => {
+  const webview = getCurrentWebviewWindow();
+  
+  unlistenDragDrop = await webview.onDragDropEvent((event) => {
+    if (event.payload.type === "drop") {
+      const paths = event.payload.paths;
+      if (paths.length > 0) {
+        // Subir archivos arrastrados
+        fileBrowser.uploadFilesFromPaths(paths);
+      }
+    }
+  });
+});
+
+onUnmounted(() => {
+  unlistenDragDrop?.();
+});
 </script>
 
 <style scoped>
