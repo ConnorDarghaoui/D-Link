@@ -28,9 +28,7 @@ src-tauri/gen/apple/
 # ============================================
 # IDE / Editors
 # ============================================
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+.vscode/
 .idea/
 *.suo
 *.ntvs*

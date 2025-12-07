@@ -79,15 +79,21 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: 'a34c873a9717a888f58dc05571dde15571e8ee15'
-
-      - name: Install libusb via vcpkg
+      - name: Install vcpkg and libusb
+        shell: pwsh
         run: |
-          vcpkg install libusb:x64-windows-static
-          echo "LIBUSB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static" >> $env:GITHUB_ENV
+          # Clonar vcpkg
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          
+          # Bootstrap vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          
+          # Instalar libusb estatico
+          C:\vcpkg\vcpkg.exe install libusb:x64-windows-static
+          
+          # Configurar variables de entorno para el build
+          echo "LIBUSB_DIR=C:\vcpkg\installed\x64-windows-static" >> $env:GITHUB_ENV
+          echo "VCPKG_ROOT=C:\vcpkg" >> $env:GITHUB_ENV
           echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
 
       - name: Cache Rust dependencies
