@@ -6,9 +6,6 @@ import {
 } from "unocss";
 
 export default defineConfig({
-  // Usar 'media' para detectar automaticamente el tema del sistema
-  // o 'class' si quieres control manual
-  darkMode: "media",
   presets: [
     presetWind(),
     presetIcons({

@@ -56,7 +56,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
+          releaseBody: 'Release de D-Link para Linux y Windows.'
           releaseDraft: true
           prerelease: false
 
@@ -79,12 +79,15 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install vcpkg and libusb
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 'a34c873a9717a888f58dc05571dde15571e8ee15'
+
+      - name: Install libusb via vcpkg
         run: |
-          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
-          C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg install libusb:x64-windows-static
-          echo "LIBUSB_DIR=C:\vcpkg\installed\x64-windows-static" >> $env:GITHUB_ENV
+          vcpkg install libusb:x64-windows-static
+          echo "LIBUSB_DIR=$env:VCPKG_ROOT\installed\x64-windows-static" >> $env:GITHUB_ENV
           echo "VCPKGRS_DYNAMIC=0" >> $env:GITHUB_ENV
 
       - name: Cache Rust dependencies
@@ -102,47 +105,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
-          releaseDraft: true
-          prerelease: false
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install libusb
-        run: brew install libusb
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install frontend dependencies
-        run: pnpm install
-
-      - name: Build Tauri app (macOS)
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'D-Link ${{ github.ref_name }}'
-          releaseBody: 'Release of D-Link for Linux, Windows, and macOS.'
+          releaseBody: 'Release de D-Link para Linux y Windows.'
           releaseDraft: true
           prerelease: false

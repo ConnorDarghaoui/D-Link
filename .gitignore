@@ -1,3 +1,11 @@
+# ============================================
+# Node.js
+# ============================================
+node_modules
+dist
+dist-ssr
+*.local
+
 # Logs
 logs
 *.log
@@ -7,18 +15,57 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# ============================================
+# Rust / Tauri
+# ============================================
+src-tauri/target/
+src-tauri/Cargo.lock
 
-# Editor directories and files
+# Tauri generated files (mobile builds)
+src-tauri/gen/android/
+src-tauri/gen/apple/
+
+# ============================================
+# IDE / Editors
+# ============================================
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+!.vscode/settings.json
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ============================================
+# Build / Release
+# ============================================
+*.app
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+*.msi
+*.exe
+*.tar.gz
+
+# ============================================
+# Misc
+# ============================================
+*.env
+*.env.local
+*.env.*.local
+.cache/
+.turbo/
